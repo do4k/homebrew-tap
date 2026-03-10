@@ -1,0 +1,52 @@
+name: Update Cask
+
+on:
+  repository_dispatch:
+    types: [update-cask]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.3.1)"
+        required: true
+      sha256:
+        description: "SHA256 of the DMG"
+        required: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set variables
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "version=${{ github.event.client_payload.version }}" >> "$GITHUB_OUTPUT"
+            echo "sha256=${{ github.event.client_payload.sha256 }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "sha256=${{ inputs.sha256 }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update cask formula
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          SHA256="${{ steps.vars.outputs.sha256 }}"
+          CASK_FILE="Casks/unnaturalscrollwheels-do4k.rb"
+
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" "$CASK_FILE"
+          sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" "$CASK_FILE"
+
+          echo "Updated $CASK_FILE to version $VERSION with sha256 $SHA256"
+          cat "$CASK_FILE"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/unnaturalscrollwheels-do4k.rb
+          git commit -m "Update unnaturalscrollwheels-do4k to ${{ steps.vars.outputs.version }}"
+          git push
